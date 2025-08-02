@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
+import { cookies } from 'next/headers';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerClient();
+    const cookieStore = cookies();
+    const supabase = createServerClient(cookieStore);
     
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -31,17 +33,9 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .single();
 
-    if (settingsError || !settings?.n8n_host || !settings?.n8n_api_token) {
-      return NextResponse.json(
-        { error: 'N8N configuration not found. Please configure your N8N settings first.' },
-        { status: 400 }
-      );
-    }
-
-    // Fetch the workflow data
     // Use environment variables as fallback if not provided
-    const hostUrl = n8nHost || process.env.N8N_HOST_URL;
-    const apiKey = n8nApiKey || process.env.N8N_API_KEY;
+    const hostUrl = settings?.n8n_host || process.env.N8N_HOST_URL;
+    const apiKey = settings?.n8n_api_token || process.env.N8N_API_KEY;
 
     if (!hostUrl || !apiKey) {
       return NextResponse.json(
@@ -49,10 +43,18 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Fetch the workflow data
+    const workflowResponse = await fetch(workflowUrl);
+
+    if (!workflowResponse.ok) {
+      throw new Error(`Failed to fetch workflow: ${workflowResponse.status}`);
+    }
+
     const workflowData = await workflowResponse.json();
 
     // Install workflow to user's N8N instance
-    const response = await fetch(`${hostUrl}/rest/workflows`, {
+    const n8nResponse = await fetch(`${hostUrl.replace(/\/$/, '')}/api/v1/workflows`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
