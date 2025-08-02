@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
         { error: 'N8N host and API key are required. Please configure them in settings or environment variables.' },
         { status: 400 }
       );
+    }
     const workflowData = await workflowResponse.json();
 
     // Install workflow to user's N8N instance
