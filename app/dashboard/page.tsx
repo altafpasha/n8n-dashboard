@@ -1,34 +1,80 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter } from 'next/navigation';
 import { WorkflowCard } from '@/components/dashboard/workflow-card';
 import { WorkflowPreview } from '@/components/dashboard/workflow-preview';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { GitHubWorkflow, WorkflowData } from '@/types/database';
+import { Input } from '@/components/ui/input';
+import { GitHubWorkflow, WorkflowData, Database } from '@/types/database';
 import { toast } from 'sonner';
 
 export default function DashboardPage() {
   const [workflows, setWorkflows] = useState<GitHubWorkflow[]>([]);
   const [loading, setLoading] = useState(true);
   const [previewWorkflow, setPreviewWorkflow] = useState<WorkflowData | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [installedWorkflowNames, setInstalledWorkflowNames] = useState<Set<string>>(new Set());
+  const supabase = createClientComponentClient<Database>();
+  const router = useRouter();
 
-  useEffect(() => {
-    fetchWorkflows();
-  }, []);
-
-  const fetchWorkflows = async () => {
+  const fetchWorkflows = useCallback(async () => {
+    setLoading(true);
     try {
-      const response = await fetch('/api/workflows/github');
-      if (!response.ok) throw new Error('Failed to fetch workflows');
-      
-      const data = await response.json();
-      setWorkflows(data.workflows || []);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        router.push('/auth/login');
+        return;
+      }
+
+      const [githubResponse, installedResponse] = await Promise.all([
+        fetch('/api/workflows/github'),
+        fetch('/api/workflows/installed'),
+      ]);
+
+      if (!githubResponse.ok) throw new Error('Failed to fetch workflows from GitHub');
+      const githubData = await githubResponse.json();
+      setWorkflows(githubData.workflows || []);
+
+      if (!installedResponse.ok) throw new Error('Failed to fetch installed workflows');
+      const installedData = await installedResponse.json();
+      const names = new Set(installedData.installedWorkflows.map((w: { name: string }) => w.name) as string[]);
+      setInstalledWorkflowNames(names);
+
     } catch (error) {
       console.error('Error fetching workflows:', error);
-      toast.error('Failed to load workflows from GitHub');
+      toast.error('Failed to load workflows');
     } finally {
       setLoading(false);
     }
+  }, [supabase, router]);
+
+  useEffect(() => {
+    fetchWorkflows();
+  }, [fetchWorkflows]);
+
+  const formatWorkflowName = (name: string) => {
+    return name
+      .replace(/\.json$/, '')
+      .replace(/[-_]/g, ' ')
+      .replace(/\b\w/g, (l) => l.toUpperCase());
+  };
+
+  const getWorkflowDescription = (name: string) => {
+    const descriptions: { [key: string]: string } = {
+      'slack-notification': 'Send notifications to Slack channels',
+      'email-automation': 'Automate email workflows and responses',
+      'data-sync': 'Synchronize data between different platforms',
+      'webhook-handler': 'Handle incoming webhooks and process data',
+      'file-processor': 'Process and transform files automatically',
+      'api-integration': 'Integrate with various APIs and services',
+      'database-backup': 'Backup and manage database operations',
+      'social-media': 'Automate social media posting and monitoring',
+    };
+
+    const key = name.toLowerCase().replace(/\.json$/, '');
+    return descriptions[key] || 'A powerful N8N workflow template ready to use';
   };
 
   const handlePreview = async (workflow: GitHubWorkflow) => {
@@ -92,6 +138,11 @@ export default function DashboardPage() {
     }
   };
 
+  const filteredWorkflows = workflows.filter(workflow =>
+    formatWorkflowName(workflow.name).toLowerCase().includes(searchTerm.toLowerCase()) ||
+    getWorkflowDescription(workflow.name).toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -109,24 +160,38 @@ export default function DashboardPage() {
         <p className="text-gray-600 mt-2">
           Browse and install pre-built N8N workflows from the community
         </p>
+        <div className="mt-4">
+          <Input
+            type="text"
+            placeholder="Search workflows..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="max-w-sm"
+          />
+        </div>
       </div>
 
-      {workflows.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <LoadingSpinner size="lg" />
+        </div>
+      ) : filteredWorkflows.length === 0 ? (
         <div className="text-center py-12">
-          <div className="text-gray-500 text-lg">No workflows found</div>
+          <div className="text-gray-500 text-lg">No workflows found matching your search</div>
           <p className="text-gray-400 mt-2">
-            Check your GitHub repository configuration
+            Try a different search term or check your GitHub repository configuration
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {workflows.map((workflow) => (
+          {filteredWorkflows.map((workflow) => (
             <WorkflowCard
-              key={workflow.sha}
+              key={workflow.id}
               workflow={workflow}
               onPreview={() => handlePreview(workflow)}
               onInstall={() => handleInstall(workflow)}
               onDownload={() => handleDownload(workflow)}
+              isInstalled={installedWorkflowNames.has(formatWorkflowName(workflow.name))}
             />
           ))}
         </div>

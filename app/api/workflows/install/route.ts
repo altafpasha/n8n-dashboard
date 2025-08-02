@@ -4,8 +4,7 @@ import { cookies } from 'next/headers';
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies();
-    const supabase = createServerClient(cookieStore);
+    const supabase = createServerClient();
     
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -17,11 +16,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { workflowUrl, name } = await request.json();
+    const { name, workflowData, workflowUrl } = await request.json();
 
-    if (!workflowUrl || !name) {
+    let finalWorkflowData = workflowData;
+
+    if (!finalWorkflowData && workflowUrl) {
+      try {
+        const response = await fetch(workflowUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch workflow from URL: ${response.statusText}`);
+        }
+        finalWorkflowData = await response.json();
+      } catch (fetchError) {
+        console.error('Error fetching workflow from URL:', fetchError);
+        return NextResponse.json(
+          { error: `Failed to retrieve workflow data from URL: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (!finalWorkflowData || !name) {
       return NextResponse.json(
-        { error: 'Workflow URL and name are required' },
+        { error: 'Workflow data and name are required' },
         { status: 400 }
       );
     }
@@ -44,14 +61,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch the workflow data
-    const workflowResponse = await fetch(workflowUrl);
-
-    if (!workflowResponse.ok) {
-      throw new Error(`Failed to fetch workflow: ${workflowResponse.status}`);
-    }
-
-    const workflowData = await workflowResponse.json();
+    // Create workflow payload without read-only fields
+    const workflowPayload = {
+      name: finalWorkflowData.name || name,
+      nodes: finalWorkflowData.nodes,
+      connections: finalWorkflowData.connections,
+      settings: finalWorkflowData.settings?.timezone ? { timezone: finalWorkflowData.settings.timezone } : {}, // Only include timezone if present to avoid "additional properties" error
+      staticData: finalWorkflowData.staticData,
+    };
 
     // Install workflow to user's N8N instance
     const n8nResponse = await fetch(`${hostUrl.replace(/\/$/, '')}/api/v1/workflows`, {
@@ -60,15 +77,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
         'X-N8N-API-KEY': apiKey,
       },
-      body: JSON.stringify({
-        name: workflowData.name || name,
-        nodes: workflowData.nodes,
-        connections: workflowData.connections,
-        active: false, // Don't activate by default
-        settings: workflowData.settings,
-        staticData: workflowData.staticData,
-        tags: workflowData.tags,
-      }),
+      body: JSON.stringify(workflowPayload),
     });
 
     if (!n8nResponse.ok) {
@@ -77,10 +86,36 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await n8nResponse.json();
+    const workflowId = result.data?.id;
+
+    // If the original workflow had tags and the workflow was created successfully,
+    // try to update it with tags (this might work depending on N8N version)
+    if (finalWorkflowData.tags && finalWorkflowData.tags.length > 0 && workflowId) {
+      try {
+        const updateResponse = await fetch(`${hostUrl.replace(/\/$/, '')}/api/v1/workflows/${workflowId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-N8N-API-KEY': apiKey,
+          },
+          body: JSON.stringify({
+            ...workflowPayload,
+            tags: finalWorkflowData.tags,
+          }),
+        });
+
+        if (!updateResponse.ok) {
+          console.warn('Failed to update workflow with tags, but workflow was created successfully');
+        }
+      } catch (tagError) {
+        console.warn('Failed to add tags to workflow:', tagError);
+        // Don't fail the entire operation if tag update fails
+      }
+    }
 
     return NextResponse.json({ 
       success: true, 
-      workflowId: result.data?.id,
+      workflowId: workflowId,
       message: 'Workflow installed successfully'
     });
 

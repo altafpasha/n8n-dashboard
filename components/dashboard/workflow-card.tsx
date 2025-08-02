@@ -5,15 +5,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { GitHubWorkflow } from '@/types/database';
 import { Eye, Download, Play, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge'; // Import Badge component
 
 interface WorkflowCardProps {
   workflow: GitHubWorkflow;
   onPreview: () => void;
   onInstall: () => Promise<void>;
   onDownload: () => void;
+  isInstalled: boolean;
 }
 
-export function WorkflowCard({ workflow, onPreview, onInstall, onDownload }: WorkflowCardProps) {
+export function WorkflowCard({ workflow, onPreview, onInstall, onDownload, isInstalled }: WorkflowCardProps) {
   const [installing, setInstalling] = useState(false);
 
   const handleInstall = async () => {
@@ -49,19 +51,21 @@ export function WorkflowCard({ workflow, onPreview, onInstall, onDownload }: Wor
   };
 
   return (
-    <Card className="group relative backdrop-blur-sm bg-white/70 border-white/30 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
+    <Card className="group relative flex flex-col h-full backdrop-blur-sm bg-white/70 border-white/30 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
       <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-600/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
       
-      <CardHeader className="relative">
-        <CardTitle className="text-lg font-semibold text-gray-800 group-hover:text-gray-900 transition-colors">
-          {formatWorkflowName(workflow.name)}
-        </CardTitle>
-        <CardDescription className="text-gray-600">
+      <CardHeader className="relative pb-2">
+        <div className="flex justify-between items-start">
+          <CardTitle className="text-lg font-semibold text-gray-800 group-hover:text-gray-900 transition-colors">
+            {formatWorkflowName(workflow.name)}
+          </CardTitle>
+        </div>
+        <CardDescription className="text-gray-600 text-sm">
           {getWorkflowDescription(workflow.name)}
         </CardDescription>
       </CardHeader>
       
-      <CardContent className="relative">
+      <CardContent className="relative flex flex-col flex-grow">
         <div className="flex flex-wrap gap-2 mb-4">
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
             N8N Workflow
@@ -69,9 +73,14 @@ export function WorkflowCard({ workflow, onPreview, onInstall, onDownload }: Wor
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
             Ready to Use
           </span>
+          {isInstalled && (
+            <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+              Installed
+            </Badge>
+          )}
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 mt-auto"> {/* mt-auto pushes this div to the bottom */}
           <Button
             variant="outline"
             size="sm"
@@ -85,15 +94,19 @@ export function WorkflowCard({ workflow, onPreview, onInstall, onDownload }: Wor
           <Button
             size="sm"
             onClick={handleInstall}
-            disabled={installing}
+            disabled={installing || isInstalled} // Disable if installing or already installed
             className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0"
           >
             {installing ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : isInstalled ? (
+              'Installed'
             ) : (
-              <Play className="h-4 w-4 mr-2" />
+              <>
+                <Play className="h-4 w-4 mr-2" />
+                Install
+              </>
             )}
-            {installing ? 'Installing...' : 'Install'}
           </Button>
           
           <Button

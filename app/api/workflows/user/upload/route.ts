@@ -48,6 +48,13 @@ export async function POST(request: NextRequest) {
       throw uploadError;
     }
 
+    // Construct the public URL for the uploaded file
+    const { data: publicUrlData } = supabase.storage
+      .from('workflows')
+      .getPublicUrl(filePath);
+
+    const workflowUrl = publicUrlData.publicUrl;
+
     // Save workflow metadata to database
     const { data: workflowData, error: dbError } = await supabase
       .from('workflows')
@@ -57,6 +64,7 @@ export async function POST(request: NextRequest) {
         storage_path: filePath,
         display_name: displayName,
         description: description,
+        workflow_url: workflowUrl, // Add workflow_url here
       })
       .select()
       .single();

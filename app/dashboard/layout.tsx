@@ -13,11 +13,13 @@ export default async function DashboardLayout({
   try {
     const { data: { user: authUser } } = await supabase.auth.getUser();
     user = authUser;
+    console.log('User in dashboard layout:', user); // Add this line for debugging
   } catch (error) {
     console.warn('Failed to get user in dashboard layout:', error);
   }
   
   if (!user) {
+    console.log('No user found, redirecting to login.'); // Add this line for debugging
     redirect('/auth/login');
   }
 
