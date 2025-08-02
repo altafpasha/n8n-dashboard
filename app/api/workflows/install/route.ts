@@ -39,19 +39,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch the workflow data
-    const workflowResponse = await fetch(workflowUrl);
-    if (!workflowResponse.ok) {
-      throw new Error('Failed to fetch workflow data');
-    }
+    // Use environment variables as fallback if not provided
+    const hostUrl = n8nHost || process.env.N8N_HOST_URL;
+    const apiKey = n8nApiKey || process.env.N8N_API_KEY;
 
+    if (!hostUrl || !apiKey) {
+      return NextResponse.json(
+        { error: 'N8N host and API key are required. Please configure them in settings or environment variables.' },
+        { status: 400 }
+      );
     const workflowData = await workflowResponse.json();
 
     // Install workflow to user's N8N instance
-    const n8nResponse = await fetch(`${settings.n8n_host}/api/v1/workflows`, {
+    const response = await fetch(`${hostUrl}/rest/workflows`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-N8N-API-KEY': settings.n8n_api_token,
+        'X-N8N-API-KEY': apiKey,
       },
       body: JSON.stringify({
         name: workflowData.name || name,

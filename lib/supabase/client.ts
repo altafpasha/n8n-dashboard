@@ -6,14 +6,17 @@ export const createClient = () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('Supabase environment variables not configured');
+  if (!supabaseUrl || !supabaseAnonKey || 
+      supabaseUrl.includes('placeholder') || 
+      supabaseAnonKey.includes('placeholder') ||
+      supabaseUrl === 'your_supabase_project_url_here' ||
+      supabaseAnonKey === 'your_supabase_anon_key_here') {
+    console.warn('Supabase environment variables not properly configured');
     // Return a mock client to prevent crashes during development
     return {
       auth: {
         getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-        signInWithPassword: () => Promise.resolve({ data: null, error: { message: 'Supabase not configured' } }),
-        signUp: () => Promise.resolve({ data: null, error: { message: 'Supabase not configured' } }),
+        signInWithPassword: () => Promise.resolve({ data: { user: null }, error: { message: 'Supabase not configured' } }),
         signOut: () => Promise.resolve({ error: null }),
         onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } })
       },
