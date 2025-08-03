@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -14,6 +14,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { 
   Workflow, 
   Settings, 
@@ -30,6 +36,25 @@ export function DashboardNav() {
   const { user, signOut } = useAuth();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [n8nConnected, setN8nConnected] = useState(false);
+
+  useEffect(() => {
+    const checkN8nStatus = async () => {
+      try {
+        const response = await fetch('/api/n8n-status');
+        const data = await response.json();
+        setN8nConnected(data.isConnected);
+      } catch (error) {
+        console.error('Failed to fetch n8n status:', error);
+        setN8nConnected(false);
+      }
+    };
+
+    checkN8nStatus();
+    // Optionally, refresh status periodically
+    const interval = setInterval(checkN8nStatus, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSignOut = async () => {
     try {
@@ -50,18 +75,19 @@ export function DashboardNav() {
   const isActive = (href: string) => pathname === href;
 
   return (
-    <nav className="sticky top-0 z-50 backdrop-blur-lg bg-white/80 border-b border-white/20 shadow-lg">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <Link href="/dashboard" className="flex items-center space-x-2">
-            <div className="p-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600">
-              <Workflow className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              N8N Manager
-            </span>
-          </Link>
+    <TooltipProvider>
+      <nav className="sticky top-0 z-50 backdrop-blur-lg bg-white/80 border-b border-white/20 shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo */}
+            <Link href="/dashboard" className="flex items-center space-x-2">
+              <div className="p-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600">
+                <Workflow className="h-6 w-6 text-white" />
+              </div>
+              <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                N8N Manager
+              </span>
+            </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
@@ -86,6 +112,22 @@ export function DashboardNav() {
 
           {/* User Menu */}
           <div className="flex items-center space-x-4">
+            {/* N8N Connection Status */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className={`h-3 w-3 rounded-full ${
+                    n8nConnected
+                      ? 'bg-green-500 shadow-green-glow'
+                      : 'bg-red-500 shadow-red-glow'
+                  }`}
+                />
+              </TooltipTrigger>
+              <TooltipContent className="backdrop-blur-lg bg-white/90">
+                <p>{n8nConnected ? 'n8n Connected' : 'n8n Disconnected'}</p>
+              </TooltipContent>
+            </Tooltip>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -168,5 +210,6 @@ export function DashboardNav() {
         )}
       </div>
     </nav>
+    </TooltipProvider>
   );
 }

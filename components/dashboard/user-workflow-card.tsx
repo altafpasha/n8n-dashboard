@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserWorkflow } from '@/types/database';
-import { Eye, Trash2, Calendar, Loader2, Download, Play } from 'lucide-react';
-import { Badge } from '@/components/ui/badge'; // Import Badge component
+import { UserWorkflow, WorkflowData } from '@/types/database'; // Keep UserWorkflow for base type
+import { Eye, Trash2, Calendar, Loader2, Download, Play, GitFork, Tag, Layers, Zap } from 'lucide-react'; // Added new icons
+import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,16 +18,29 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
+// Re-define EnhancedUserWorkflow here or import it if it's in a shared types file
+interface EnhancedUserWorkflow extends Omit<UserWorkflow, 'description'> {
+  trigger_type: string;
+  node_count: number;
+  category: string;
+  complexity: 'low' | 'medium' | 'high';
+  tags: string[];
+  description: string | null;
+  last_updated?: string;
+  author?: string;
+  rating?: number;
+  downloads?: number;
+}
+
 interface UserWorkflowCardProps {
-  workflow: UserWorkflow;
+  workflow: EnhancedUserWorkflow; // Use EnhancedUserWorkflow
   onPreview: () => void;
   onDelete: () => Promise<void>;
   onInstall: () => Promise<void>;
   onDownload: () => void;
-  isInstalled: boolean;
 }
 
-export function UserWorkflowCard({ workflow, onPreview, onDelete, onInstall, onDownload, isInstalled }: UserWorkflowCardProps) {
+export function UserWorkflowCard({ workflow, onPreview, onDelete, onInstall, onDownload }: UserWorkflowCardProps) {
   const [deleting, setDeleting] = useState(false);
   const [installing, setInstalling] = useState(false);
 
@@ -85,11 +98,6 @@ export function UserWorkflowCard({ workflow, onPreview, onDelete, onInstall, onD
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
             N8N Workflow
           </span>
-          {isInstalled && (
-            <Badge variant="secondary" className="bg-purple-100 text-purple-800">
-              Installed
-            </Badge>
-          )}
         </div>
         
         <div className="flex gap-2 mt-auto"> {/* mt-auto pushes this div to the bottom */}
@@ -106,13 +114,11 @@ export function UserWorkflowCard({ workflow, onPreview, onDelete, onInstall, onD
           <Button
             size="sm"
             onClick={handleInstall}
-            disabled={installing || isInstalled} // Disable if installing or already installed
+            disabled={installing} // Disable if installing or already installed
             className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0"
           >
             {installing ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : isInstalled ? (
-              'Installed'
             ) : (
               <>
                 <Play className="h-4 w-4 mr-2" />

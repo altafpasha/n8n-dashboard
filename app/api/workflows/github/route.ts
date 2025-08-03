@@ -29,8 +29,8 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json();
     
-    // Filter for JSON files only
-    const workflows = Array.isArray(data) 
+    // Filter for JSON files only and fetch their content
+    const fetchedWorkflows = Array.isArray(data) 
       ? data.filter((file: any) => 
           file.name.endsWith('.json') && 
           file.type === 'file' &&
@@ -38,7 +38,24 @@ export async function GET(request: NextRequest) {
         )
       : [];
 
-    return NextResponse.json({ workflows });
+    const workflowsWithContent = await Promise.all(
+      fetchedWorkflows.map(async (workflowFile: any) => {
+        try {
+          const contentResponse = await fetch(workflowFile.download_url);
+          if (!contentResponse.ok) {
+            console.warn(`Failed to fetch content for ${workflowFile.name}: ${contentResponse.statusText}`);
+            return { ...workflowFile, workflow_data: null }; // Return with null content on failure
+          }
+          const workflowData = await contentResponse.json();
+          return { ...workflowFile, workflow_data: workflowData };
+        } catch (contentError) {
+          console.error(`Error fetching content for ${workflowFile.name}:`, contentError);
+          return { ...workflowFile, workflow_data: null }; // Return with null content on error
+        }
+      })
+    );
+
+    return NextResponse.json({ workflows: workflowsWithContent });
   } catch (error) {
     console.error('Error fetching GitHub workflows:', error);
     return NextResponse.json(

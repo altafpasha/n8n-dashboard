@@ -29,3 +29,8 @@ export interface WorkflowCard {
   path: string;
   data?: N8NWorkflow;
 }
+
+export interface InstalledWorkflowsResponse {
+  success: boolean;
+  installedWorkflows: N8NWorkflow[];
+}

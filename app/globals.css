@@ -80,3 +80,12 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Neon glow effect for status indicator */
+.shadow-green-glow {
+  box-shadow: 0 0 5px #84cc16, 0 0 10px #84cc16, 0 0 15px #84cc16, 0 0 20px #84cc16;
+}
+
+.shadow-red-glow {
+  box-shadow: 0 0 5px #ef4444, 0 0 10px #ef4444, 0 0 15px #ef4444, 0 0 20px #ef4444;
+}
